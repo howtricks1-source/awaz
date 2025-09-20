@@ -307,7 +307,7 @@ export interface PaginatedResponse<T> {
 
 // Form Types
 export interface LoginForm {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -315,11 +315,14 @@ export interface RegisterForm {
   username: string;
   email: string;
   password: string;
-  confirmPassword: string;
-  firstName: string;
-  lastName: string;
-  studentId: string;
-  phone?: string;
+  password_confirm: string;
+  first_name: string;
+  last_name: string;
+  student_id: string;
+  phone_number?: string;
+  department: number;
+  date_of_birth?: string;
+  address?: string;
 }
 
 

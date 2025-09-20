@@ -1,41 +1,67 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
+import { RegisterForm } from '@/types';
+import { api } from '@/lib/api';
 
-interface RegisterFormData {
-  username: string;
-  email: string;
-  password: string;
+interface RegisterFormData extends RegisterForm {
   confirmPassword: string;
-  firstName: string;
-  lastName: string;
-  studentId: string;
-  phone?: string;
 }
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register: registerUser, loading, error, clearError } = useAuthStore();
+  const [departments, setDepartments] = useState<Array<{id: number, name: string}>>([]);
   const [formData, setFormData] = useState<RegisterFormData>({
     username: '',
     email: '',
     password: '',
+    password_confirm: '',
     confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    studentId: '',
-    phone: '',
+    first_name: '',
+    last_name: '',
+    student_id: '',
+    phone_number: '',
+    department: 0,
+    date_of_birth: '',
+    address: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Fetch departments on component mount
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const response = await api.get('/departments/');
+        setDepartments(response.data.results || response.data);
+      } catch (error) {
+        console.error('Failed to fetch departments:', error);
+        // Fallback departments for demo
+        setDepartments([
+          { id: 1, name: 'Computer Science' },
+          { id: 2, name: 'Engineering' },
+          { id: 3, name: 'Business Administration' },
+          { id: 4, name: 'Arts & Sciences' },
+        ]);
+      }
+    };
+    fetchDepartments();
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: name === 'department' ? parseInt(value) : value,
+      // Sync password_confirm with confirmPassword
+      ...(name === 'confirmPassword' ? { password_confirm: value } : {}),
+      ...(name === 'password_confirm' ? { confirmPassword: value } : {}),
+    }));
     
     // Clear validation error for this field
     if (validationErrors[name]) {
@@ -72,16 +98,20 @@ export default function RegisterPage() {
       errors.confirmPassword = 'Passwords do not match';
     }
 
-    if (!formData.firstName.trim()) {
-      errors.firstName = 'First name is required';
+    if (!formData.first_name.trim()) {
+      errors.first_name = 'First name is required';
     }
 
-    if (!formData.lastName.trim()) {
-      errors.lastName = 'Last name is required';
+    if (!formData.last_name.trim()) {
+      errors.last_name = 'Last name is required';
     }
 
-    if (!formData.studentId.trim()) {
-      errors.studentId = 'Student ID is required';
+    if (!formData.student_id.trim()) {
+      errors.student_id = 'Student ID is required';
+    }
+
+    if (!formData.department || formData.department === 0) {
+      errors.department = 'Please select a department';
     }
 
     setValidationErrors(errors);
@@ -96,116 +126,56 @@ export default function RegisterPage() {
     }
 
     try {
-      await registerUser({
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        student_id: formData.studentId,
-        phone: formData.phone || undefined,
-      });
+      // Remove confirmPassword before sending to API
+      const { confirmPassword, ...registrationData } = formData;
+      await registerUser(registrationData);
       
-      // Redirect to login page after successful registration
-      router.push('/auth/login?registered=true');
+      // Registration successful, redirect to login
+      router.push('/auth/login?message=Registration successful! Please log in.');
     } catch (error) {
-      // Error is handled by the auth store
+      // Error is handled by the store
       console.error('Registration failed:', error);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-green-600 rounded-full flex items-center justify-center">
-            <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+        <div>
+          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-indigo-100">
+            <svg className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Create Your Account
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Create Student Account
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Join Hamari Awaz to submit and track your complaints
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Join Hamari Awaz complaint management system
           </p>
         </div>
 
-        {/* Registration Form */}
-        <div className="bg-white py-8 px-6 shadow-lg rounded-lg">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Error Alert */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex">
-                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-800">{error}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={clearError}
-                    className="ml-auto text-red-400 hover:text-red-600"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Name Fields */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
-                  First Name *
-                </label>
-                <input
-                  id="firstName"
-                  name="firstName"
-                  type="text"
-                  required
-                  value={formData.firstName}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
-                    validationErrors.firstName ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="First name"
-                />
-                {validationErrors.firstName && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.firstName}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Name *
-                </label>
-                <input
-                  id="lastName"
-                  name="lastName"
-                  type="text"
-                  required
-                  value={formData.lastName}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
-                    validationErrors.lastName ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="Last name"
-                />
-                {validationErrors.lastName && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.lastName}</p>
-                )}
-              </div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md relative">
+              <span className="block sm:inline">{error}</span>
+              <button
+                type="button"
+                className="absolute top-0 bottom-0 right-0 px-4 py-3"
+                onClick={clearError}
+              >
+                <span className="sr-only">Dismiss</span>
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
+          )}
 
-            {/* Username Field */}
+          <div className="space-y-4">
+            {/* Username */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
                 Username *
               </label>
               <input
@@ -215,32 +185,31 @@ export default function RegisterPage() {
                 required
                 value={formData.username}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
+                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
                   validationErrors.username ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Choose a username"
+                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
+                placeholder="Enter your username"
               />
               {validationErrors.username && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.username}</p>
               )}
             </div>
 
-            {/* Email Field */}
+            {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email Address *
               </label>
               <input
                 id="email"
                 name="email"
                 type="email"
-                autoComplete="email"
                 required
                 value={formData.email}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
+                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
                   validationErrors.email ? 'border-red-300' : 'border-gray-300'
-                }`}
+                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
                 placeholder="Enter your email address"
               />
               {validationErrors.email && (
@@ -248,174 +217,225 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Student ID Field */}
+            {/* First Name */}
             <div>
-              <label htmlFor="studentId" className="block text-sm font-medium text-gray-700 mb-1">
-                Student ID *
+              <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">
+                First Name *
               </label>
               <input
-                id="studentId"
-                name="studentId"
+                id="first_name"
+                name="first_name"
                 type="text"
                 required
-                value={formData.studentId}
+                value={formData.first_name}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
-                  validationErrors.studentId ? 'border-red-300' : 'border-gray-300'
-                }`}
-                placeholder="Enter your student ID"
+                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
+                  validationErrors.first_name ? 'border-red-300' : 'border-gray-300'
+                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
+                placeholder="Enter your first name"
               />
-              {validationErrors.studentId && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.studentId}</p>
+              {validationErrors.first_name && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.first_name}</p>
               )}
             </div>
 
-            {/* Phone Field */}
+            {/* Last Name */}
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number (Optional)
+              <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">
+                Last Name *
               </label>
               <input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={formData.phone}
+                id="last_name"
+                name="last_name"
+                type="text"
+                required
+                value={formData.last_name}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                placeholder="Enter your phone number"
+                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
+                  validationErrors.last_name ? 'border-red-300' : 'border-gray-300'
+                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
+                placeholder="Enter your last name"
+              />
+              {validationErrors.last_name && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.last_name}</p>
+              )}
+            </div>
+
+            {/* Student ID */}
+            <div>
+              <label htmlFor="student_id" className="block text-sm font-medium text-gray-700">
+                Student ID *
+              </label>
+              <input
+                id="student_id"
+                name="student_id"
+                type="text"
+                required
+                value={formData.student_id}
+                onChange={handleInputChange}
+                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
+                  validationErrors.student_id ? 'border-red-300' : 'border-gray-300'
+                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
+                placeholder="Enter your student ID"
+              />
+              {validationErrors.student_id && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.student_id}</p>
+              )}
+            </div>
+
+            {/* Department */}
+            <div>
+              <label htmlFor="department" className="block text-sm font-medium text-gray-700">
+                Department *
+              </label>
+              <select
+                id="department"
+                name="department"
+                required
+                value={formData.department}
+                onChange={handleInputChange}
+                className={`mt-1 block w-full px-3 py-2 border ${
+                  validationErrors.department ? 'border-red-300' : 'border-gray-300'
+                } bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+              >
+                <option value={0}>Select your department</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+              {validationErrors.department && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.department}</p>
+              )}
+            </div>
+
+            {/* Phone Number */}
+            <div>
+              <label htmlFor="phone_number" className="block text-sm font-medium text-gray-700">
+                Phone Number
+              </label>
+              <input
+                id="phone_number"
+                name="phone_number"
+                type="tel"
+                value={formData.phone_number}
+                onChange={handleInputChange}
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Enter your phone number (optional)"
               />
             </div>
 
-            {/* Password Fields */}
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                  Password *
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    required
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 pr-10 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
-                      validationErrors.password ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Create a password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-                {validationErrors.password && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirm Password *
-                </label>
-                <div className="relative">
-                  <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    required
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 pr-10 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
-                      validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="Confirm your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                  >
-                    {showConfirmPassword ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-                {validationErrors.confirmPassword && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.confirmPassword}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Submit Button */}
+            {/* Password */}
             <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <div className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Password *
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className={`appearance-none relative block w-full px-3 py-2 pr-10 border ${
+                    validationErrors.password ? 'border-red-300' : 'border-gray-300'
+                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
                     </svg>
-                    Creating account...
-                  </div>
-                ) : (
-                  'Create Account'
-                )}
-              </button>
+                  ) : (
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {validationErrors.password && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
+              )}
             </div>
 
-            {/* Login Link */}
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Already have an account?{' '}
-                <Link href="/auth/login" className="font-medium text-green-600 hover:text-green-500">
-                  Sign in here
-                </Link>
-              </p>
+            {/* Confirm Password */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                Confirm Password *
+              </label>
+              <div className="mt-1 relative">
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className={`appearance-none relative block w-full px-3 py-2 pr-10 border ${
+                    validationErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
+                  placeholder="Confirm your password"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {validationErrors.confirmPassword && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.confirmPassword}</p>
+              )}
             </div>
-          </form>
-        </div>
+          </div>
 
-        {/* Note */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">📝 Registration Note</h3>
-          <p className="text-xs text-blue-700">
-            Only students can register through this form. Staff and administrative accounts are created by system administrators.
-          </p>
-        </div>
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Creating Account...
+                </div>
+              ) : (
+                'Create Account'
+              )}
+            </button>
+          </div>
 
-        {/* Footer */}
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            © 2024 Hamari Awaz. All rights reserved.
-          </p>
-        </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link href="/auth/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+                Sign in here
+              </Link>
+            </p>
+          </div>
+        </form>
       </div>
     </div>
   );
