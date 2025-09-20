@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AuthUser, User, LoginForm, DashboardStats } from '@/types';
+import { AuthUser, User, LoginForm, RegisterForm, DashboardStats } from '@/types';
 import { authApi } from '@/lib/api';
 
 interface AuthState {
@@ -9,6 +9,7 @@ interface AuthState {
   isLoading: boolean;
   dashboardStats: DashboardStats | null;
   login: (credentials: LoginForm) => Promise<void>;
+  register: (userData: RegisterForm) => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
   fetchDashboardStats: () => Promise<void>;
@@ -37,6 +38,18 @@ export const useAuthStore = create<AuthState>()(
 
           // Fetch dashboard stats after login
           get().fetchDashboardStats();
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      register: async (userData: RegisterForm) => {
+        try {
+          set({ isLoading: true });
+          const response = await authApi.register(userData);
+          set({ isLoading: false });
+          // Don't auto-login after registration, let user login manually
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -84,4 +97,3 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
-
