@@ -315,13 +315,14 @@ export interface RegisterForm {
   username: string;
   email: string;
   password: string;
-  confirm_password: string;
-  first_name: string;
-  last_name: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  studentId: string;
   phone?: string;
-  student_id?: string;
-  department: number;
 }
+
+
 
 export interface ProfileUpdateForm {
   first_name: string;
@@ -364,4 +365,3 @@ export interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
 }
-
