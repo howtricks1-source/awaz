@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from .models import (
     Complaint, ComplaintForward, ComplaintResponse, ComplaintComment,
-    ComplaintFeedback, WithdrawalRequest
+    ComplaintFeedback, WithdrawalRequest, Notification, ActivityLog
 )
 from accounts.models import User
 from departments.models import Department
@@ -280,3 +280,180 @@ class ComplaintStatsSerializer(serializers.Serializer):
     complaints_by_department = serializers.DictField()
     recent_complaints = serializers.IntegerField()
 
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for notifications
+    """
+    recipient_name = serializers.CharField(source='recipient.get_full_name', read_only=True)
+    type_icon = serializers.CharField(source='get_type_icon', read_only=True)
+    type_color = serializers.CharField(source='get_type_color', read_only=True)
+    related_complaint_number = serializers.CharField(source='related_complaint.complaint_number', read_only=True)
+    related_withdrawal_number = serializers.CharField(source='related_withdrawal.request_number', read_only=True)
+    
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'recipient', 'recipient_name', 'notification_type',
+            'title', 'message', 'link', 'is_read', 'created_at', 'read_at',
+            'type_icon', 'type_color', 'related_complaint', 'related_complaint_number',
+            'related_withdrawal', 'related_withdrawal_number'
+        ]
+        read_only_fields = [
+            'id', 'recipient', 'created_at', 'read_at', 'type_icon', 'type_color'
+        ]
+
+
+class NotificationMarkReadSerializer(serializers.Serializer):
+    """
+    Serializer for marking notifications as read
+    """
+    notification_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="List of notification IDs to mark as read. If empty, marks all as read."
+    )
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer for activity logs
+    """
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_role = serializers.CharField(source='user.role', read_only=True)
+    action_icon = serializers.CharField(source='get_action_icon', read_only=True)
+    action_color = serializers.CharField(source='get_action_color', read_only=True)
+    related_complaint_number = serializers.CharField(source='related_complaint.complaint_number', read_only=True)
+    related_withdrawal_number = serializers.CharField(source='related_withdrawal.request_number', read_only=True)
+    
+    class Meta:
+        model = ActivityLog
+        fields = [
+            'id', 'user', 'user_name', 'user_role', 'action', 'description',
+            'timestamp', 'action_icon', 'action_color', 'ip_address',
+            'related_complaint', 'related_complaint_number',
+            'related_withdrawal', 'related_withdrawal_number',
+            'additional_data'
+        ]
+        read_only_fields = ['id', 'timestamp']
+
+
+class UserBasicSerializer(serializers.ModelSerializer):
+    """
+    Basic user serializer for dropdowns and references
+    """
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'first_name', 'last_name',
+            'full_name', 'role', 'department', 'department_name'
+        ]
+        read_only_fields = ['id', 'username', 'email']
+
+
+class DepartmentBasicSerializer(serializers.ModelSerializer):
+    """
+    Basic department serializer for dropdowns and references
+    """
+    head_name = serializers.CharField(source='head.get_full_name', read_only=True)
+    
+    class Meta:
+        model = Department
+        fields = ['id', 'name', 'description', 'head', 'head_name', 'is_active']
+        read_only_fields = ['id']
+
+
+class ComplaintTimelineSerializer(serializers.Serializer):
+    """
+    Serializer for complaint timeline view
+    """
+    type = serializers.CharField()  # 'created', 'forwarded', 'comment', 'response', 'status_change'
+    timestamp = serializers.DateTimeField()
+    user = UserBasicSerializer()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    icon = serializers.CharField()
+    color = serializers.CharField()
+    data = serializers.DictField(required=False)
+
+
+class AnalyticsSerializer(serializers.Serializer):
+    """
+    Serializer for analytics data
+    """
+    complaints_by_department = serializers.DictField()
+    complaints_by_status = serializers.DictField()
+    complaints_by_priority = serializers.DictField()
+    resolution_rate = serializers.FloatField()
+    average_resolution_time = serializers.FloatField()
+    feedback_ratings = serializers.DictField()
+    monthly_trends = serializers.DictField()
+    top_departments = serializers.ListField()
+    recent_activity = serializers.ListField()
+    unresolved_rate = serializers.FloatField()
+
+
+class FileUploadSerializer(serializers.Serializer):
+    """
+    Serializer for file uploads
+    """
+    file = serializers.FileField()
+    
+    def validate_file(self, value):
+        # File size validation (10MB max)
+        if value.size > 10 * 1024 * 1024:
+            raise serializers.ValidationError("File size cannot exceed 10MB")
+        
+        # File type validation
+        allowed_types = [
+            'image/jpeg', 'image/png', 'image/gif',
+            'application/pdf', 'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain'
+        ]
+        
+        if value.content_type not in allowed_types:
+            raise serializers.ValidationError("File type not allowed")
+        
+        return value
+
+
+class BulkActionSerializer(serializers.Serializer):
+    """
+    Serializer for bulk actions on complaints
+    """
+    ACTION_CHOICES = [
+        ('assign', 'Assign'),
+        ('status_change', 'Change Status'),
+        ('priority_change', 'Change Priority'),
+        ('department_change', 'Change Department'),
+    ]
+    
+    complaint_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        min_length=1
+    )
+    action = serializers.ChoiceField(choices=ACTION_CHOICES)
+    
+    # Optional fields based on action
+    assigned_to = serializers.IntegerField(required=False)
+    status = serializers.CharField(required=False)
+    priority = serializers.CharField(required=False)
+    department = serializers.IntegerField(required=False)
+    
+    def validate(self, data):
+        action = data.get('action')
+        
+        if action == 'assign' and not data.get('assigned_to'):
+            raise serializers.ValidationError("assigned_to is required for assign action")
+        elif action == 'status_change' and not data.get('status'):
+            raise serializers.ValidationError("status is required for status_change action")
+        elif action == 'priority_change' and not data.get('priority'):
+            raise serializers.ValidationError("priority is required for priority_change action")
+        elif action == 'department_change' and not data.get('department'):
+            raise serializers.ValidationError("department is required for department_change action")
+        
+        return data
