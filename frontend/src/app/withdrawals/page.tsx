@@ -2,49 +2,47 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useComplaintStore } from '@/store/useComplaintStore';
-import { Complaint } from '@/types';
+import { useWithdrawalStore } from '@/store/useWithdrawalStore';
+import { WithdrawalRequest } from '@/types';
 
-export default function ComplaintsPage() {
+export default function WithdrawalsPage() {
   const { user } = useAuthStore();
-  const { complaints, loading, fetchComplaints } = useComplaintStore();
+  const { withdrawals, loading, fetchWithdrawals } = useWithdrawalStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
 
   useEffect(() => {
     if (user) {
-      fetchComplaints();
+      fetchWithdrawals();
     }
-  }, [user, fetchComplaints]);
+  }, [user, fetchWithdrawals]);
 
-  const filteredComplaints = complaints.filter(complaint => {
-    const matchesSearch = complaint.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         complaint.complaint_number.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || complaint.status === statusFilter;
-    const matchesPriority = !priorityFilter || complaint.priority === priorityFilter;
+  const filteredWithdrawals = withdrawals.filter(withdrawal => {
+    const matchesSearch = withdrawal.request_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         withdrawal.reason.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = !statusFilter || withdrawal.status === statusFilter;
+    const matchesType = !typeFilter || withdrawal.type === typeFilter;
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus && matchesType;
   });
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Pending': return 'bg-yellow-100 text-yellow-800';
-      case 'In Progress': return 'bg-blue-100 text-blue-800';
-      case 'Resolved': return 'bg-green-100 text-green-800';
+      case 'Approved': return 'bg-green-100 text-green-800';
       case 'Rejected': return 'bg-red-100 text-red-800';
-      case 'Not Resolved': return 'bg-gray-100 text-gray-800';
-      case 'Closed': return 'bg-gray-100 text-gray-800';
+      case 'Under Review': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'Low': return 'bg-green-100 text-green-800';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800';
-      case 'High': return 'bg-orange-100 text-orange-800';
-      case 'Critical': return 'bg-red-100 text-red-800';
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'Course': return 'bg-blue-100 text-blue-800';
+      case 'Semester': return 'bg-purple-100 text-purple-800';
+      case 'Program': return 'bg-red-100 text-red-800';
+      case 'Other': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -72,18 +70,25 @@ export default function ComplaintsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Complaints</h1>
-            <p className="text-gray-600 mt-2">Track and manage your submitted complaints</p>
+            <h1 className="text-3xl font-bold text-gray-900">Withdrawal Requests</h1>
+            <p className="text-gray-600 mt-2">
+              {user?.role === 'Student' 
+                ? 'Submit and track your withdrawal requests' 
+                : 'Review and manage withdrawal requests'
+              }
+            </p>
           </div>
-          <a
-            href="/complaints/create"
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            File New Complaint
-          </a>
+          {user?.role === 'Student' && (
+            <a
+              href="/withdrawals/create"
+              className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Request
+            </a>
+          )}
         </div>
 
         {/* Filters */}
@@ -98,8 +103,8 @@ export default function ComplaintsPage() {
                 id="search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Search by title or number..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="Search by request number or reason..."
               />
             </div>
             
@@ -111,33 +116,31 @@ export default function ComplaintsPage() {
                 id="status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               >
                 <option value="">All Status</option>
                 <option value="Pending">Pending</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Resolved">Resolved</option>
+                <option value="Under Review">Under Review</option>
+                <option value="Approved">Approved</option>
                 <option value="Rejected">Rejected</option>
-                <option value="Not Resolved">Not Resolved</option>
-                <option value="Closed">Closed</option>
               </select>
             </div>
             
             <div>
-              <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-1">
-                Priority
+              <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+                Type
               </label>
               <select
-                id="priority"
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                id="type"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               >
-                <option value="">All Priority</option>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
+                <option value="">All Types</option>
+                <option value="Course">Course Withdrawal</option>
+                <option value="Semester">Semester Withdrawal</option>
+                <option value="Program">Program Withdrawal</option>
+                <option value="Other">Other</option>
               </select>
             </div>
             
@@ -146,7 +149,7 @@ export default function ComplaintsPage() {
                 onClick={() => {
                   setSearchTerm('');
                   setStatusFilter('');
-                  setPriorityFilter('');
+                  setTypeFilter('');
                 }}
                 className="w-full px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
               >
@@ -156,29 +159,31 @@ export default function ComplaintsPage() {
           </div>
         </div>
 
-        {/* Complaints List */}
+        {/* Withdrawals List */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          {filteredComplaints.length === 0 ? (
+          {filteredWithdrawals.length === 0 ? (
             <div className="text-center py-12">
               <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM9 7H4l5-5v5z" />
               </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No complaints found</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No withdrawal requests found</h3>
               <p className="text-gray-600 mb-4">
-                {searchTerm || statusFilter || priorityFilter 
+                {searchTerm || statusFilter || typeFilter 
                   ? 'Try adjusting your filters to see more results.'
-                  : 'You haven\'t filed any complaints yet.'
+                  : user?.role === 'Student' 
+                    ? 'You haven\'t submitted any withdrawal requests yet.'
+                    : 'No withdrawal requests to review.'
                 }
               </p>
-              {!searchTerm && !statusFilter && !priorityFilter && (
+              {user?.role === 'Student' && !searchTerm && !statusFilter && !typeFilter && (
                 <a
-                  href="/complaints/create"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  href="/withdrawals/create"
+                  className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  File Your First Complaint
+                  Submit Your First Request
                 </a>
               )}
             </div>
@@ -188,63 +193,65 @@ export default function ComplaintsPage() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Complaint
+                      Request
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Department
+                      Type
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Priority
+                      Submitted
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
+                    {user?.role !== 'Student' && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Student
+                      </th>
+                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredComplaints.map((complaint) => (
-                    <tr key={complaint.id} className="hover:bg-gray-50">
+                  {filteredWithdrawals.map((withdrawal) => (
+                    <tr key={withdrawal.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {complaint.title}
+                            {withdrawal.reason.length > 50 
+                              ? `${withdrawal.reason.substring(0, 50)}...` 
+                              : withdrawal.reason
+                            }
                           </div>
                           <div className="text-sm text-gray-500 font-mono">
-                            {complaint.complaint_number}
+                            {withdrawal.request_number}
                           </div>
-                          {complaint.is_urgent && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 mt-1">
-                              Urgent
-                            </span>
-                          )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {complaint.department_name}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(complaint.status)}`}>
-                          {complaint.status}
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(withdrawal.type)}`}>
+                          {withdrawal.type}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(complaint.priority)}`}>
-                          {complaint.priority}
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(withdrawal.status)}`}>
+                          {withdrawal.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(complaint.created_at).toLocaleDateString()}
+                        {new Date(withdrawal.created_at).toLocaleDateString()}
                       </td>
+                      {user?.role !== 'Student' && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {withdrawal.submitted_by_name}
+                        </td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <a
-                          href={`/complaints/${complaint.id}`}
-                          className="text-blue-600 hover:text-blue-900"
+                          href={`/withdrawals/${withdrawal.id}`}
+                          className="text-purple-600 hover:text-purple-900"
                         >
                           View Details
                         </a>
@@ -260,4 +267,3 @@ export default function ComplaintsPage() {
     </div>
   );
 }
-
