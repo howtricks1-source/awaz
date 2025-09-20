@@ -31,6 +31,7 @@ def api_root(request):
                 'departments': '/api/departments/',
                 'complaints': '/api/complaints/',
                 'notifications': '/api/notifications/',
+                'analytics': '/api/analytics/',
                 'admin': '/admin/',
             }
         })
@@ -43,6 +44,7 @@ def api_root(request):
                 'departments': '/api/departments/',
                 'complaints': '/api/complaints/',
                 'track': '/api/complaints/track/',
+                'analytics': '/api/analytics/',
                 'admin': '/admin/',
             }
         })
@@ -60,6 +62,7 @@ urlpatterns = [
     path('api/departments/', include('departments.urls')),
     path('api/complaints/', include('complaints.urls')),
     path('api/notifications/', include('notifications.urls')),
+    path('api/analytics/', include('analytics.urls')),
 ]
 
 # Serve media files in development
