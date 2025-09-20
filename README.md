@@ -1,6 +1,6 @@
 # Hamari Awaz - Complaint Management System
 
-A comprehensive complaint management system for educational institutions built with Django REST Framework and Next.js.
+A comprehensive web application for managing complaints in educational institutions with role-based access control, automated workflows, and analytics.
 
 ## 🏗️ Architecture
 
@@ -191,4 +191,3 @@ This project is licensed under the MIT License.
 ## 📞 Support
 
 For support and questions, please contact the development team.
-
