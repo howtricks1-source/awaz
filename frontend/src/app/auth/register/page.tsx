@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/useAuthStore';
 import { RegisterForm } from '@/types';
-import { api } from '@/lib/api';
+import { departmentApi } from '@/lib/api';
 
 interface RegisterFormData extends RegisterForm {
   confirmPassword: string;
@@ -37,8 +37,8 @@ export default function RegisterPage() {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const response = await api.get('/departments/');
-        setDepartments(response.data.results || response.data);
+        const response = await departmentApi.getDepartments();
+        setDepartments(response.data);
       } catch (error) {
         console.error('Failed to fetch departments:', error);
         // Fallback departments for demo
@@ -440,4 +440,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-

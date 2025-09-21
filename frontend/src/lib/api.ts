@@ -42,8 +42,10 @@ api.interceptors.request.use(
       const authStorage = localStorage.getItem('auth-storage');
       if (authStorage) {
         const { state } = JSON.parse(authStorage);
-        if (state?.user?.access_token) {
-          config.headers.Authorization = `Bearer ${state.user.access_token}`;
+        // Check for access token in the correct location
+        const accessToken = state?.user?.access || state?.access_token || state?.user?.access_token;
+        if (accessToken) {
+          config.headers.Authorization = `Bearer ${accessToken}`;
         }
       }
     }
@@ -54,7 +56,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle auth errors
+// Response interceptor to handle auth errors and standardize error format
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -65,6 +67,37 @@ api.interceptors.response.use(
         window.location.href = '/auth/login';
       }
     }
+    
+    // Standardize error message format
+    if (error.response?.data) {
+      const errorData = error.response.data;
+      let errorMessage = 'An error occurred';
+      
+      // Handle different Django REST Framework error formats
+      if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData.detail) {
+        errorMessage = errorData.detail;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (errorData.non_field_errors) {
+        errorMessage = Array.isArray(errorData.non_field_errors) 
+          ? errorData.non_field_errors.join(', ')
+          : errorData.non_field_errors;
+      } else if (typeof errorData === 'object') {
+        // Handle field-specific errors
+        const fieldErrors = Object.values(errorData).flat();
+        if (fieldErrors.length > 0) {
+          errorMessage = fieldErrors.join(', ');
+        }
+      }
+      
+      // Attach standardized error message
+      error.standardizedMessage = errorMessage;
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -113,6 +146,15 @@ export const authApi = {
 
   getUserStats: (): Promise<AxiosResponse<any>> =>
     api.get('/auth/users/stats/'),
+
+  createUser: (data: any): Promise<AxiosResponse<User>> =>
+    api.post('/auth/users/', data),
+
+  updateUser: (id: number, data: any): Promise<AxiosResponse<User>> =>
+    api.patch(`/auth/users/${id}/`, data),
+
+  deleteUser: (id: number): Promise<AxiosResponse<void>> =>
+    api.delete(`/auth/users/${id}/`),
 
   getDashboardStats: (): Promise<AxiosResponse<DashboardStats>> =>
     api.get('/analytics/dashboard/'),
@@ -260,6 +302,12 @@ export const analyticsApi = {
 
   getUserActivity: (): Promise<AxiosResponse<any[]>> =>
     api.get('/analytics/users/'),
+};
+
+// Activity Log API
+export const activityLogApi = {
+  getActivityLogs: (params?: any): Promise<AxiosResponse<any>> =>
+    api.get('/activity-logs/', { params }),
 };
 
 export default api;

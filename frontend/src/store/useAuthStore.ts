@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthState>()(
             error: null,
           });
         } catch (error: any) {
-          const errorMessage = error.response?.data?.message || 
+          const errorMessage = error.standardizedMessage || 
                               error.response?.data?.detail || 
                               error.message || 
                               'Login failed. Please try again.';

@@ -11,7 +11,7 @@ import {
 } from 'react-icons/fa';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { api } from '@/lib/api';
+import { analyticsApi, authApi, departmentApi, activityLogApi } from '@/lib/api';
 
 interface User {
   id: number;
@@ -113,7 +113,7 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       
       // Fetch system statistics
-      const statsResponse = await api.get('/api/analytics/system/');
+      const statsResponse = await analyticsApi.getSystemOverview();
       setStats(statsResponse.data);
       
     } catch (error) {
@@ -125,7 +125,7 @@ const AdminDashboard: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get('/api/auth/users/');
+      const response = await authApi.getUsers();
       setAllUsers(response.data.results || response.data);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -134,8 +134,8 @@ const AdminDashboard: React.FC = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await api.get('/api/departments/');
-      setDepartments(response.data.results || response.data);
+      const response = await departmentApi.getDepartments();
+      setDepartments(response.data);
     } catch (error) {
       console.error('Error fetching departments:', error);
     }
@@ -143,8 +143,8 @@ const AdminDashboard: React.FC = () => {
 
   const fetchActivityLogs = async () => {
     try {
-      const response = await api.get('/api/activity-logs/', {
-        params: { limit: 10, ordering: '-timestamp' }
+      const response = await activityLogApi.getActivityLogs({
+        limit: 10, ordering: '-timestamp'
       });
       setActivityLogs(response.data.results || response.data);
     } catch (error) {
@@ -154,7 +154,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleCreateUser = async () => {
     try {
-      await api.post('/api/auth/users/', userForm);
+      await authApi.createUser(userForm);
       setShowUserModal(false);
       setUserForm({ full_name: '', email: '', role: 'Student', department: '', password: '' });
       fetchUsers();
@@ -169,7 +169,7 @@ const AdminDashboard: React.FC = () => {
     if (!selectedUser) return;
     
     try {
-      await api.patch(`/api/auth/users/${selectedUser.id}/`, {
+      await authApi.updateUser(selectedUser.id, {
         full_name: userForm.full_name,
         email: userForm.email,
         role: userForm.role,
@@ -191,7 +191,7 @@ const AdminDashboard: React.FC = () => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     
     try {
-      await api.delete(`/api/auth/users/${userId}/`);
+      await authApi.deleteUser(userId);
       fetchUsers();
       alert('User deleted successfully!');
     } catch (error) {
@@ -202,7 +202,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleCreateDepartment = async () => {
     try {
-      await api.post('/api/departments/', departmentForm);
+      await departmentApi.createDepartment(departmentForm);
       setShowDepartmentModal(false);
       setDepartmentForm({ name: '', head: '' });
       fetchDepartments();
@@ -217,7 +217,7 @@ const AdminDashboard: React.FC = () => {
     if (!selectedDepartment) return;
     
     try {
-      await api.patch(`/api/departments/${selectedDepartment.id}/`, departmentForm);
+      await departmentApi.updateDepartment(selectedDepartment.id, departmentForm);
       setShowDepartmentModal(false);
       setSelectedDepartment(null);
       setDepartmentForm({ name: '', head: '' });
@@ -233,7 +233,7 @@ const AdminDashboard: React.FC = () => {
     if (!confirm('Are you sure you want to delete this department?')) return;
     
     try {
-      await api.delete(`/api/departments/${departmentId}/`);
+      await departmentApi.deleteDepartment(departmentId);
       fetchDepartments();
       alert('Department deleted successfully!');
     } catch (error) {

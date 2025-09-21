@@ -6,7 +6,7 @@ import { Card, Row, Col, Button, Badge, Table, Modal, Form, Alert, Spinner } fro
 import { FaPlus, FaEye, FaComments, FaStar, FaBell, FaChartLine, FaFileAlt, FaClock, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { api } from '@/lib/api';
+import { complaintApi, analyticsApi } from '@/lib/api';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { toast } from 'react-toastify';
 
@@ -59,12 +59,12 @@ const StudentDashboard: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch complaints
-      const complaintsResponse = await api.get('/complaints/');
+      // Fetch complaints using proper API module
+      const complaintsResponse = await complaintApi.getComplaints();
       setComplaints(complaintsResponse.data.results || complaintsResponse.data);
       
-      // Fetch dashboard statistics
-      const statsResponse = await api.get('/analytics/dashboard/');
+      // Fetch dashboard statistics using proper API module
+      const statsResponse = await analyticsApi.getDashboardStats();
       setStats(statsResponse.data);
       
     } catch (error) {
@@ -87,7 +87,7 @@ const StudentDashboard: React.FC = () => {
     if (!selectedComplaint) return;
     
     try {
-      await api.post('/complaints/feedback/', {
+      await complaintApi.submitFeedback({
         complaint: selectedComplaint.id,
         rating: feedbackForm.rating,
         feedback_text: feedbackForm.feedback_text
