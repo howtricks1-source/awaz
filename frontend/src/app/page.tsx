@@ -5,20 +5,19 @@ import { useRouter } from 'next/navigation';
 import { Container, Row, Col, Card, Button, Spinner } from 'react-bootstrap';
 import { FaFileAlt, FaUsers, FaChartBar, FaShieldAlt } from 'react-icons/fa';
 import Link from 'next/link';
-import { useAuthStore } from '@/store/authStore';
-import AppProviders from '@/components/providers/AppProviders';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const LandingPage: React.FC = () => {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { user, loading } = useAuthStore();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (user) {
       router.push('/dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [user, router]);
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center min-vh-100">
         <Spinner animation="border" role="status">
@@ -28,12 +27,11 @@ const LandingPage: React.FC = () => {
     );
   }
 
-  if (isAuthenticated) {
+  if (user) {
     return null; // Will redirect to dashboard
   }
 
   return (
-    <AppProviders>
       <div className="min-vh-100 bg-light">
         {/* Hero Section */}
         <section className="bg-primary text-white py-5">
@@ -240,9 +238,7 @@ const LandingPage: React.FC = () => {
           </Container>
         </footer>
       </div>
-    </AppProviders>
   );
 };
 
 export default LandingPage;
-

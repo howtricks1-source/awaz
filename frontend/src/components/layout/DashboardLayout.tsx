@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Container, Spinner } from 'react-bootstrap';
 import { useAuthStore } from '@/store/useAuthStore';
 import Navbar from './Navbar';
 
@@ -25,10 +26,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <Spinner animation="border" variant="primary" className="mb-3" />
+          <p className="text-muted">Loading...</p>
         </div>
       </div>
     );
@@ -39,12 +40,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-vh-100 bg-light">
       <Navbar />
-      <main className="flex-1">
-        {children}
+      <main style={{ paddingTop: '76px' }}>
+        <Container fluid className="py-4">
+          {children}
+        </Container>
       </main>
     </div>
   );
 }
-

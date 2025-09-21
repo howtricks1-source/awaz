@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, Row, Col, Button, Badge, Table, Modal, Form, Alert } from 'react-bootstrap';
-import { FaPlus, FaEye, FaComments, FaStar, FaBell, FaChartLine } from 'react-icons/fa';
+import { Card, Row, Col, Button, Badge, Table, Modal, Form, Alert, Spinner } from 'react-bootstrap';
+import { FaPlus, FaEye, FaComments, FaStar, FaBell, FaChartLine, FaFileAlt, FaClock, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { api } from '@/lib/api';
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import { toast } from 'react-toastify';
 
 interface Complaint {
   id: number;
@@ -20,16 +22,17 @@ interface Complaint {
 }
 
 interface DashboardStats {
-  total_complaints: number;
+  my_complaints: number;
   pending_complaints: number;
   in_progress_complaints: number;
   resolved_complaints: number;
-  recent_complaints: number;
+  my_withdrawals: number;
+  unread_notifications: number;
 }
 
 const StudentDashboard: React.FC = () => {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const { notifications, unreadCount, fetchNotifications } = useNotificationStore();
   
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -50,21 +53,23 @@ const StudentDashboard: React.FC = () => {
     
     fetchDashboardData();
     fetchNotifications();
-  }, [user, router]);
+  }, [user, router, fetchNotifications]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       
       // Fetch complaints
-      const complaintsResponse = await api.get('/api/complaints/');
+      const complaintsResponse = await api.get('/complaints/');
       setComplaints(complaintsResponse.data.results || complaintsResponse.data);
       
-      // Fetch statistics
-      const statsResponse = await api.get('/api/reports/statistics/');
+      // Fetch dashboard statistics
+      const statsResponse = await api.get('/analytics/dashboard/');
       setStats(statsResponse.data);
       
+    } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -82,7 +87,7 @@ const StudentDashboard: React.FC = () => {
     if (!selectedComplaint) return;
     
     try {
-      await api.post('/api/feedback/', {
+      await api.post('/complaints/feedback/', {
         complaint: selectedComplaint.id,
         rating: feedbackForm.rating,
         feedback_text: feedbackForm.feedback_text
@@ -92,11 +97,10 @@ const StudentDashboard: React.FC = () => {
       setFeedbackForm({ rating: 5, feedback_text: '' });
       fetchDashboardData(); // Refresh data
       
-      // Show success message
-      alert('Feedback submitted successfully!');
+      toast.success('Feedback submitted successfully!');
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      alert('Error submitting feedback. Please try again.');
+      toast.error('Error submitting feedback. Please try again.');
     }
   };
 
@@ -123,21 +127,27 @@ const StudentDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
+      <DashboardLayout>
+        <div className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}>
+          <div className="text-center">
+            <Spinner animation="border" variant="primary" className="mb-3" />
+            <p className="text-muted">Loading dashboard...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="container-fluid py-4">
+    <DashboardLayout>
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h2 className="mb-1">Student Dashboard</h2>
-          <p className="text-muted mb-0">Welcome back, {user?.first_name}!</p>
+          <h2 className="mb-1 text-primary">
+            <FaFileAlt className="me-2" />
+            Student Dashboard
+          </h2>
+          <p className="text-muted mb-0">Welcome back, {user?.first_name} {user?.last_name}!</p>
         </div>
         <div className="d-flex gap-2">
           <Button variant="outline-secondary" onClick={() => router.push('/notifications')}>
@@ -157,46 +167,46 @@ const StudentDashboard: React.FC = () => {
       {/* Statistics Cards */}
       {stats && (
         <Row className="mb-4">
-          <Col md={3}>
-            <Card className="text-center border-0 shadow-sm">
+          <Col lg={3} md={6} className="mb-3">
+            <Card className="text-center border-0 shadow-sm h-100">
               <Card.Body>
                 <div className="text-primary mb-2">
-                  <FaChartLine size={24} />
+                  <FaFileAlt size={32} />
                 </div>
-                <h4 className="mb-1">{stats.total_complaints}</h4>
-                <small className="text-muted">Total Complaints</small>
+                <h3 className="mb-1 text-primary">{stats.my_complaints || 0}</h3>
+                <small className="text-muted">My Complaints</small>
               </Card.Body>
             </Card>
           </Col>
-          <Col md={3}>
-            <Card className="text-center border-0 shadow-sm">
+          <Col lg={3} md={6} className="mb-3">
+            <Card className="text-center border-0 shadow-sm h-100">
               <Card.Body>
                 <div className="text-warning mb-2">
-                  <FaComments size={24} />
+                  <FaClock size={32} />
                 </div>
-                <h4 className="mb-1">{stats.pending_complaints}</h4>
+                <h3 className="mb-1 text-warning">{stats.pending_complaints || 0}</h3>
                 <small className="text-muted">Pending</small>
               </Card.Body>
             </Card>
           </Col>
-          <Col md={3}>
-            <Card className="text-center border-0 shadow-sm">
+          <Col lg={3} md={6} className="mb-3">
+            <Card className="text-center border-0 shadow-sm h-100">
               <Card.Body>
                 <div className="text-info mb-2">
-                  <FaEye size={24} />
+                  <FaExclamationTriangle size={32} />
                 </div>
-                <h4 className="mb-1">{stats.in_progress_complaints}</h4>
+                <h3 className="mb-1 text-info">{stats.in_progress_complaints || 0}</h3>
                 <small className="text-muted">In Progress</small>
               </Card.Body>
             </Card>
           </Col>
-          <Col md={3}>
-            <Card className="text-center border-0 shadow-sm">
+          <Col lg={3} md={6} className="mb-3">
+            <Card className="text-center border-0 shadow-sm h-100">
               <Card.Body>
                 <div className="text-success mb-2">
-                  <FaStar size={24} />
+                  <FaCheckCircle size={32} />
                 </div>
-                <h4 className="mb-1">{stats.resolved_complaints}</h4>
+                <h3 className="mb-1 text-success">{stats.resolved_complaints || 0}</h3>
                 <small className="text-muted">Resolved</small>
               </Card.Body>
             </Card>
@@ -385,7 +395,7 @@ const StudentDashboard: React.FC = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </div>
+    </DashboardLayout>
   );
 };
 
