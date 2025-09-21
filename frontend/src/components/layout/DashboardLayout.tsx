@@ -1,59 +1,50 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Container } from 'react-bootstrap';
-import { useAuthStore } from '@/store/authStore';
-import { useNotificationStore } from '@/store/notificationStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import Navbar from './Navbar';
-import { useTheme } from '@/components/providers/AppProviders';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const { user, loading, checkAuth } = useAuthStore();
   const router = useRouter();
-  const { isAuthenticated, user, fetchDashboardStats } = useAuthStore();
-  const { fetchNotifications } = useNotificationStore();
-  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    checkAuth();
+  }, [checkAuth]);
+
+  useEffect(() => {
+    if (!loading && !user) {
       router.push('/auth/login');
-      return;
     }
+  }, [user, loading, router]);
 
-    // Fetch initial data
-    fetchDashboardStats();
-    fetchNotifications();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-    // Set up periodic refresh for notifications
-    const notificationInterval = setInterval(() => {
-      fetchNotifications();
-    }, 30000); // Refresh every 30 seconds
-
-    return () => {
-      clearInterval(notificationInterval);
-    };
-  }, [isAuthenticated, router, fetchDashboardStats, fetchNotifications]);
-
-  if (!isAuthenticated || !user) {
-    return null; // Will redirect to login
+  if (!user) {
+    return null;
   }
 
   return (
-    <div className="min-vh-100">
-      <Navbar theme={theme} toggleTheme={toggleTheme} />
-      
-      <main className="main-content">
-        <Container fluid className="px-4">
-          {children}
-        </Container>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="flex-1">
+        {children}
       </main>
     </div>
   );
-};
-
-export default DashboardLayout;
+}
 

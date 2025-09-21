@@ -280,3 +280,124 @@ class ComplaintStatsSerializer(serializers.Serializer):
     complaints_by_department = serializers.DictField()
     recent_complaints = serializers.IntegerField()
 
+
+
+class UserBasicSerializer(serializers.ModelSerializer):
+    """
+    Basic user serializer for dropdowns and references
+    """
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'first_name', 'last_name',
+            'full_name', 'role', 'department', 'department_name'
+        ]
+        read_only_fields = ['id', 'username', 'email']
+
+
+class DepartmentBasicSerializer(serializers.ModelSerializer):
+    """
+    Basic department serializer for dropdowns and references
+    """
+    head_name = serializers.CharField(source='head.get_full_name', read_only=True)
+    
+    class Meta:
+        model = Department
+        fields = ['id', 'name', 'description', 'head', 'head_name', 'is_active']
+        read_only_fields = ['id']
+
+
+class ComplaintTimelineSerializer(serializers.Serializer):
+    """
+    Serializer for complaint timeline view
+    """
+    type = serializers.CharField()  # 'created', 'forwarded', 'comment', 'response', 'status_change'
+    timestamp = serializers.DateTimeField()
+    user = UserBasicSerializer()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    icon = serializers.CharField()
+    color = serializers.CharField()
+    data = serializers.DictField(required=False)
+
+
+class AnalyticsSerializer(serializers.Serializer):
+    """
+    Serializer for analytics data
+    """
+    complaints_by_department = serializers.DictField()
+    complaints_by_status = serializers.DictField()
+    complaints_by_priority = serializers.DictField()
+    resolution_rate = serializers.FloatField()
+    average_resolution_time = serializers.FloatField()
+    feedback_ratings = serializers.DictField()
+    monthly_trends = serializers.DictField()
+    top_departments = serializers.ListField()
+    recent_activity = serializers.ListField()
+    unresolved_rate = serializers.FloatField()
+
+
+class FileUploadSerializer(serializers.Serializer):
+    """
+    Serializer for file uploads
+    """
+    file = serializers.FileField()
+    
+    def validate_file(self, value):
+        # File size validation (10MB max)
+        if value.size > 10 * 1024 * 1024:
+            raise serializers.ValidationError("File size cannot exceed 10MB")
+        
+        # File type validation
+        allowed_types = [
+            'image/jpeg', 'image/png', 'image/gif',
+            'application/pdf', 'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain'
+        ]
+        
+        if value.content_type not in allowed_types:
+            raise serializers.ValidationError("File type not allowed")
+        
+        return value
+
+
+class BulkActionSerializer(serializers.Serializer):
+    """
+    Serializer for bulk actions on complaints
+    """
+    ACTION_CHOICES = [
+        ('assign', 'Assign'),
+        ('status_change', 'Change Status'),
+        ('priority_change', 'Change Priority'),
+        ('department_change', 'Change Department'),
+    ]
+    
+    complaint_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        min_length=1
+    )
+    action = serializers.ChoiceField(choices=ACTION_CHOICES)
+    
+    # Optional fields based on action
+    assigned_to = serializers.IntegerField(required=False)
+    status = serializers.CharField(required=False)
+    priority = serializers.CharField(required=False)
+    department = serializers.IntegerField(required=False)
+    
+    def validate(self, data):
+        action = data.get('action')
+        
+        if action == 'assign' and not data.get('assigned_to'):
+            raise serializers.ValidationError("assigned_to is required for assign action")
+        elif action == 'status_change' and not data.get('status'):
+            raise serializers.ValidationError("status is required for status_change action")
+        elif action == 'priority_change' and not data.get('priority'):
+            raise serializers.ValidationError("priority is required for priority_change action")
+        elif action == 'department_change' and not data.get('department'):
+            raise serializers.ValidationError("department is required for department_change action")
+        
+        return data

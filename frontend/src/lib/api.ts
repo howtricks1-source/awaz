@@ -69,6 +69,9 @@ api.interceptors.response.use(
   }
 );
 
+// Export the api instance for direct use
+export { api };
+
 // Helper function to handle file uploads
 const createFormData = (data: any): FormData => {
   const formData = new FormData();
@@ -91,15 +94,7 @@ export const authApi = {
     api.post('/auth/login/', credentials),
 
   register: (data: RegisterForm): Promise<AxiosResponse<User>> =>
-    api.post('/auth/register/', {
-      username: data.username,
-      email: data.email,
-      password: data.password,
-      first_name: data.firstName,
-      last_name: data.lastName,
-      student_id: data.studentId,
-      phone: data.phone,
-    }),
+    api.post('/auth/register/', data),
 
   logout: (): Promise<AxiosResponse<void>> =>
     api.post('/auth/logout/'),

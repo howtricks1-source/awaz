@@ -49,8 +49,33 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Custom JWT token serializer with additional user info
+    Supports login with email or username
     """
+    username_field = 'email'  # Allow email as username field
+    
     def validate(self, attrs):
+        # Get email from attrs and find user by email or username
+        email_or_username = attrs.get('email')
+        password = attrs.get('password')
+        
+        if email_or_username and password:
+            # Try to find user by email first, then by username
+            user = None
+            try:
+                user = User.objects.get(email=email_or_username)
+            except User.DoesNotExist:
+                try:
+                    user = User.objects.get(username=email_or_username)
+                except User.DoesNotExist:
+                    pass
+            
+            if user and user.check_password(password):
+                # Set the username for the parent serializer
+                attrs['username'] = user.username
+                attrs.pop('email', None)  # Remove email from attrs
+            else:
+                raise serializers.ValidationError('Invalid email/username or password')
+        
         data = super().validate(attrs)
         
         # Add custom claims
@@ -101,9 +126,9 @@ class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'full_name', 'role',
-            'department_name', 'is_active', 'is_verified', 'is_suspended',
-            'date_joined', 'last_login'
+            'id', 'username', 'email', 'full_name', 'role', 
+            'department', 'department_name', 'is_active', 
+            'is_verified', 'date_joined', 'last_login'
         ]
 
 
@@ -111,26 +136,14 @@ class PasswordChangeSerializer(serializers.Serializer):
     """
     Serializer for password change
     """
-    old_password = serializers.CharField(required=True)
+    current_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True, validators=[validate_password])
-    new_password_confirm = serializers.CharField(required=True)
     
-    def validate(self, attrs):
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError("New passwords don't match")
-        return attrs
-    
-    def validate_old_password(self, value):
+    def validate_current_password(self, value):
         user = self.context['request'].user
         if not user.check_password(value):
-            raise serializers.ValidationError("Old password is incorrect")
+            raise serializers.ValidationError('Current password is incorrect')
         return value
-    
-    def save(self):
-        user = self.context['request'].user
-        user.set_password(self.validated_data['new_password'])
-        user.save()
-        return user
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -145,8 +158,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
         fields = [
             'username', 'email', 'password', 'first_name', 'last_name',
             'role', 'department', 'phone_number', 'student_id', 'employee_id',
-            'date_of_birth', 'address', 'is_active', 'is_verified'
+            'is_active', 'is_verified'
         ]
+    
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = User.objects.create_user(password=password, **validated_data)
+        return user
     
     def validate_student_id(self, value):
         if value and User.objects.filter(student_id=value).exists():
@@ -162,4 +180,3 @@ class UserCreateSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         user = User.objects.create_user(password=password, **validated_data)
         return user
-

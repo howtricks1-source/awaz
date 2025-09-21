@@ -1,292 +1,392 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Card, Row, Col, Button, Badge, Table, Modal, Form, Alert } from 'react-bootstrap';
+import { FaPlus, FaEye, FaComments, FaStar, FaBell, FaChartLine } from 'react-icons/fa';
 import { useAuthStore } from '@/store/useAuthStore';
-import { analyticsApi, complaintApi } from '@/lib/api';
-import { DashboardStats, Complaint } from '@/types';
+import { useNotificationStore } from '@/store/useNotificationStore';
+import { api } from '@/lib/api';
 
-export default function StudentDashboard() {
-  const { user } = useAuthStore();
+interface Complaint {
+  id: number;
+  complaint_number: string;
+  title: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  department: string;
+  can_receive_feedback: boolean;
+}
+
+interface DashboardStats {
+  total_complaints: number;
+  pending_complaints: number;
+  in_progress_complaints: number;
+  resolved_complaints: number;
+  recent_complaints: number;
+}
+
+const StudentDashboard: React.FC = () => {
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const { notifications, unreadCount, fetchNotifications } = useNotificationStore();
+  
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentComplaints, setRecentComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [feedbackForm, setFeedbackForm] = useState({
+    rating: 5,
+    feedback_text: ''
+  });
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch dashboard stats
-        const statsResponse = await analyticsApi.getDashboardStats();
-        setStats(statsResponse.data);
-        
-        // Fetch recent complaints
-        const complaintsResponse = await complaintApi.getComplaints({ 
-          limit: 5, 
-          ordering: '-created_at' 
-        });
-        setRecentComplaints(complaintsResponse.data.results);
-        
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchDashboardData();
+    if (!user || user.role !== 'Student') {
+      router.push('/auth/login');
+      return;
     }
-  }, [user]);
+    
+    fetchDashboardData();
+    fetchNotifications();
+  }, [user, router]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch complaints
+      const complaintsResponse = await api.get('/api/complaints/');
+      setComplaints(complaintsResponse.data.results || complaintsResponse.data);
+      
+      // Fetch statistics
+      const statsResponse = await api.get('/api/reports/statistics/');
+      setStats(statsResponse.data);
+      
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileComplaint = () => {
+    router.push('/complaints/create');
+  };
+
+  const handleViewComplaint = (complaint: Complaint) => {
+    router.push(`/complaints/${complaint.id}`);
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!selectedComplaint) return;
+    
+    try {
+      await api.post('/api/feedback/', {
+        complaint: selectedComplaint.id,
+        rating: feedbackForm.rating,
+        feedback_text: feedbackForm.feedback_text
+      });
+      
+      setShowFeedbackModal(false);
+      setFeedbackForm({ rating: 5, feedback_text: '' });
+      fetchDashboardData(); // Refresh data
+      
+      // Show success message
+      alert('Feedback submitted successfully!');
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      alert('Error submitting feedback. Please try again.');
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'Pending': return 'warning';
+      case 'In Progress': return 'info';
+      case 'Resolved': return 'success';
+      case 'Rejected': return 'danger';
+      case 'Closed': return 'dark';
+      default: return 'secondary';
+    }
+  };
+
+  const getPriorityBadgeVariant = (priority: string) => {
+    switch (priority) {
+      case 'Low': return 'success';
+      case 'Medium': return 'warning';
+      case 'High': return 'danger';
+      case 'Critical': return 'dark';
+      default: return 'secondary';
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white p-6 rounded-lg shadow">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {user?.first_name}! 👋
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Here's an overview of your complaints and activities
-          </p>
+    <div className="container-fluid py-4">
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 className="mb-1">Student Dashboard</h2>
+          <p className="text-muted mb-0">Welcome back, {user?.first_name}!</p>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">My Complaints</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.my_complaints || 0}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.pending_complaints || 0}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Resolved</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.resolved_complaints || 0}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM9 7H4l5-5v5z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Withdrawals</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.my_withdrawals || 0}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <a
-                  href="/complaints/create"
-                  className="flex items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                >
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="font-medium text-gray-900">File New Complaint</p>
-                    <p className="text-sm text-gray-600">Submit a new complaint</p>
-                  </div>
-                </a>
-
-                <a
-                  href="/withdrawals/create"
-                  className="flex items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-                >
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5z" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="font-medium text-gray-900">Request Withdrawal</p>
-                    <p className="text-sm text-gray-600">Submit withdrawal request</p>
-                  </div>
-                </a>
-
-                <a
-                  href="/complaints"
-                  className="flex items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-                >
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="font-medium text-gray-900">View My Complaints</p>
-                    <p className="text-sm text-gray-600">Track complaint status</p>
-                  </div>
-                </a>
-
-                <a
-                  href="/public/track"
-                  className="flex items-center p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
-                >
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="font-medium text-gray-900">Track Complaint</p>
-                    <p className="text-sm text-gray-600">Search by complaint number</p>
-                  </div>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Need Help?</h2>
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-medium text-gray-900 mb-2">How to file a complaint?</h3>
-                <p className="text-sm text-gray-600">
-                  Click "File New Complaint" and fill out the form with your issue details.
-                </p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-medium text-gray-900 mb-2">Track your complaint</h3>
-                <p className="text-sm text-gray-600">
-                  Use your complaint number (AWA-YYYY-XXXX) to track progress.
-                </p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-medium text-gray-900 mb-2">Contact Support</h3>
-                <p className="text-sm text-gray-600">
-                  Email: support@hamariawaz.edu<br />
-                  Phone: +92-XXX-XXXXXXX
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Complaints */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Complaints</h2>
-            <a
-              href="/complaints"
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-            >
-              View All →
-            </a>
-          </div>
-          
-          {recentComplaints.length > 0 ? (
-            <div className="space-y-4">
-              {recentComplaints.map((complaint) => (
-                <div
-                  key={complaint.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-sm font-mono text-gray-500">
-                        {complaint.complaint_number}
-                      </span>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${complaint.status_color}`}>
-                        {complaint.status}
-                      </span>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${complaint.priority_color}`}>
-                        {complaint.priority}
-                      </span>
-                    </div>
-                    <h3 className="font-medium text-gray-900 mt-1">{complaint.title}</h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {complaint.department_name} • {new Date(complaint.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <a
-                    href={`/complaints/${complaint.id}`}
-                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                  >
-                    View Details →
-                  </a>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p className="text-gray-500">No complaints filed yet</p>
-              <a
-                href="/complaints/create"
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-2 inline-block"
-              >
-                File your first complaint →
-              </a>
-            </div>
-          )}
+        <div className="d-flex gap-2">
+          <Button variant="outline-secondary" onClick={() => router.push('/notifications')}>
+            <FaBell className="me-2" />
+            Notifications
+            {unreadCount > 0 && (
+              <Badge bg="danger" className="ms-2">{unreadCount}</Badge>
+            )}
+          </Button>
+          <Button variant="primary" onClick={handleFileComplaint}>
+            <FaPlus className="me-2" />
+            File New Complaint
+          </Button>
         </div>
       </div>
+
+      {/* Statistics Cards */}
+      {stats && (
+        <Row className="mb-4">
+          <Col md={3}>
+            <Card className="text-center border-0 shadow-sm">
+              <Card.Body>
+                <div className="text-primary mb-2">
+                  <FaChartLine size={24} />
+                </div>
+                <h4 className="mb-1">{stats.total_complaints}</h4>
+                <small className="text-muted">Total Complaints</small>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={3}>
+            <Card className="text-center border-0 shadow-sm">
+              <Card.Body>
+                <div className="text-warning mb-2">
+                  <FaComments size={24} />
+                </div>
+                <h4 className="mb-1">{stats.pending_complaints}</h4>
+                <small className="text-muted">Pending</small>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={3}>
+            <Card className="text-center border-0 shadow-sm">
+              <Card.Body>
+                <div className="text-info mb-2">
+                  <FaEye size={24} />
+                </div>
+                <h4 className="mb-1">{stats.in_progress_complaints}</h4>
+                <small className="text-muted">In Progress</small>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={3}>
+            <Card className="text-center border-0 shadow-sm">
+              <Card.Body>
+                <div className="text-success mb-2">
+                  <FaStar size={24} />
+                </div>
+                <h4 className="mb-1">{stats.resolved_complaints}</h4>
+                <small className="text-muted">Resolved</small>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {/* Recent Complaints */}
+      <Card className="shadow-sm">
+        <Card.Header className="bg-white border-bottom">
+          <div className="d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">My Complaints</h5>
+            <Button 
+              variant="outline-primary" 
+              size="sm"
+              onClick={() => router.push('/complaints')}
+            >
+              View All
+            </Button>
+          </div>
+        </Card.Header>
+        <Card.Body className="p-0">
+          {complaints.length === 0 ? (
+            <div className="text-center py-5">
+              <div className="text-muted mb-3">
+                <FaComments size={48} />
+              </div>
+              <h6 className="text-muted">No complaints filed yet</h6>
+              <p className="text-muted mb-3">File your first complaint to get started</p>
+              <Button variant="primary" onClick={handleFileComplaint}>
+                <FaPlus className="me-2" />
+                File Complaint
+              </Button>
+            </div>
+          ) : (
+            <Table responsive hover className="mb-0">
+              <thead className="bg-light">
+                <tr>
+                  <th>Complaint #</th>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Department</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {complaints.slice(0, 10).map((complaint) => (
+                  <tr key={complaint.id}>
+                    <td>
+                      <code className="text-primary">{complaint.complaint_number}</code>
+                    </td>
+                    <td>
+                      <div className="fw-medium">{complaint.title}</div>
+                    </td>
+                    <td>
+                      <Badge bg={getStatusBadgeVariant(complaint.status)}>
+                        {complaint.status}
+                      </Badge>
+                    </td>
+                    <td>
+                      <Badge bg={getPriorityBadgeVariant(complaint.priority)}>
+                        {complaint.priority}
+                      </Badge>
+                    </td>
+                    <td>{complaint.department}</td>
+                    <td>
+                      <small className="text-muted">
+                        {new Date(complaint.created_at).toLocaleDateString()}
+                      </small>
+                    </td>
+                    <td>
+                      <div className="d-flex gap-1">
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => handleViewComplaint(complaint)}
+                        >
+                          <FaEye />
+                        </Button>
+                        {complaint.can_receive_feedback && (
+                          <Button
+                            variant="outline-warning"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedComplaint(complaint);
+                              setShowFeedbackModal(true);
+                            }}
+                          >
+                            <FaStar />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card.Body>
+      </Card>
+
+      {/* Recent Notifications */}
+      {notifications.length > 0 && (
+        <Card className="shadow-sm mt-4">
+          <Card.Header className="bg-white border-bottom">
+            <h5 className="mb-0">Recent Notifications</h5>
+          </Card.Header>
+          <Card.Body>
+            {notifications.slice(0, 5).map((notification) => (
+              <div key={notification.id} className="d-flex align-items-start mb-3">
+                <div className={`badge bg-${notification.type_color} me-3 mt-1`}>
+                  <i className={notification.type_icon}></i>
+                </div>
+                <div className="flex-grow-1">
+                  <div className="fw-medium">{notification.title}</div>
+                  <div className="text-muted small">{notification.message}</div>
+                  <div className="text-muted small">
+                    {new Date(notification.created_at).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Feedback Modal */}
+      <Modal show={showFeedbackModal} onHide={() => setShowFeedbackModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Submit Feedback</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedComplaint && (
+            <>
+              <Alert variant="info">
+                <strong>Complaint:</strong> {selectedComplaint.complaint_number} - {selectedComplaint.title}
+              </Alert>
+              
+              <Form>
+                <Form.Group className="mb-3">
+                  <Form.Label>Rating</Form.Label>
+                  <div className="d-flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Button
+                        key={star}
+                        variant={feedbackForm.rating >= star ? "warning" : "outline-warning"}
+                        size="sm"
+                        onClick={() => setFeedbackForm(prev => ({ ...prev, rating: star }))}
+                      >
+                        <FaStar />
+                      </Button>
+                    ))}
+                  </div>
+                  <Form.Text className="text-muted">
+                    {feedbackForm.rating} star{feedbackForm.rating !== 1 ? 's' : ''}
+                  </Form.Text>
+                </Form.Group>
+                
+                <Form.Group className="mb-3">
+                  <Form.Label>Feedback</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={4}
+                    value={feedbackForm.feedback_text}
+                    onChange={(e) => setFeedbackForm(prev => ({ ...prev, feedback_text: e.target.value }))}
+                    placeholder="Please share your experience with the complaint resolution..."
+                    required
+                  />
+                </Form.Group>
+              </Form>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowFeedbackModal(false)}>
+            Cancel
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleSubmitFeedback}
+            disabled={!feedbackForm.feedback_text.trim()}
+          >
+            Submit Feedback
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
-}
+};
+
+export default StudentDashboard;
