@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from .models import (
     Complaint, ComplaintForward, ComplaintResponse, ComplaintComment,
-    ComplaintFeedback, WithdrawalRequest, Notification, ActivityLog
+    ComplaintFeedback, WithdrawalRequest
 )
 from accounts.models import User
 from departments.models import Department
@@ -280,62 +280,6 @@ class ComplaintStatsSerializer(serializers.Serializer):
     complaints_by_department = serializers.DictField()
     recent_complaints = serializers.IntegerField()
 
-
-class NotificationSerializer(serializers.ModelSerializer):
-    """
-    Serializer for notifications
-    """
-    recipient_name = serializers.CharField(source='recipient.get_full_name', read_only=True)
-    type_icon = serializers.CharField(source='get_type_icon', read_only=True)
-    type_color = serializers.CharField(source='get_type_color', read_only=True)
-    related_complaint_number = serializers.CharField(source='related_complaint.complaint_number', read_only=True)
-    related_withdrawal_number = serializers.CharField(source='related_withdrawal.request_number', read_only=True)
-    
-    class Meta:
-        model = Notification
-        fields = [
-            'id', 'recipient', 'recipient_name', 'notification_type',
-            'title', 'message', 'link', 'is_read', 'created_at', 'read_at',
-            'type_icon', 'type_color', 'related_complaint', 'related_complaint_number',
-            'related_withdrawal', 'related_withdrawal_number'
-        ]
-        read_only_fields = [
-            'id', 'recipient', 'created_at', 'read_at', 'type_icon', 'type_color'
-        ]
-
-
-class NotificationMarkReadSerializer(serializers.Serializer):
-    """
-    Serializer for marking notifications as read
-    """
-    notification_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        required=False,
-        help_text="List of notification IDs to mark as read. If empty, marks all as read."
-    )
-
-
-class ActivityLogSerializer(serializers.ModelSerializer):
-    """
-    Serializer for activity logs
-    """
-    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    user_role = serializers.CharField(source='user.role', read_only=True)
-    action_icon = serializers.CharField(source='get_action_icon', read_only=True)
-    action_color = serializers.CharField(source='get_action_color', read_only=True)
-    related_complaint_number = serializers.CharField(source='related_complaint.complaint_number', read_only=True)
-    related_withdrawal_number = serializers.CharField(source='related_withdrawal.request_number', read_only=True)
-    
-    class Meta:
-        model = ActivityLog
-        fields = [
-            'id', 'user', 'user_name', 'user_role', 'action', 'description',
-            'timestamp', 'action_icon', 'action_color', 'ip_address',
-            'related_complaint', 'related_complaint_number',
-            'related_withdrawal', 'related_withdrawal_number',
-            'additional_data'
-        ]
-        read_only_fields = ['id', 'timestamp']
 
 
 class UserBasicSerializer(serializers.ModelSerializer):
